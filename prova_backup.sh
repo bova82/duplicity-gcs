@@ -16,6 +16,11 @@ GPG_SIGN_KEY=SIGN_KEY
 #Encryption passphrases. They must have to be set to avoid prompt password request
 GPG_ENCR_PASSPHRASE="encryption_password"
 GPG_SIGN_PASSPHRASE="signing_password"
+#LOGGING
+#File are created inside the specified directory (check if you have the permissions)
+#The file name is duplicity<YYYYMMDDhhmmss>.log with the current timestamp
+#If not specified non log file is written
+LOG_DIR="/tmp"
 
 #Exporting environment variables
 if [ -z "$GOOGLE_STORAGE_KEY" ]; then
@@ -64,11 +69,21 @@ execute_backup() {
 	if [ ! -z "$FULL_BACKUP_EVERY" ]; then
 	  BKP_CMD="${BASE_BKP_CMD} --full-if-older-than ${FULL_BACKUP_EVERY}"
 	fi
-	eval "${BKP_CMD} ${SRC} ${DEST}"
+	LOG_CMD=""
+	if [ ! -z "$LOG_DIR" ]; then
+	  #cd $LOG_DIR
+	  NOW="$(date +'%Y%m%d%H%M%S')"
+	  LOG_FILE="duplicity${NOW}.log"
+	  LOG_CMD="&> ${LOG_FILE}"
+	fi
+	pwd
+	echo "${BKP_CMD} ${SRC} ${DEST} ${LOG_CMD}"
+	eval "${BKP_CMD} ${SRC} ${DEST} ${LOG_CMD}"
 
 	if [ ! -z "$FULL_BACKUPS_TO_MANTAIN" ]; then
 	  BKP_CMD2="${BASE_BKP_CMD} remove-all-but-n-full ${FULL_BACKUPS_TO_MANTAIN} --force ${DEST}"
-	  eval "${BKP_CMD2}"
+	  echo "${BKP_CMD2} ${LOG_CMD}"
+	  eval "${BKP_CMD2} ${LOG_CMD}"
 	fi
 }
 
@@ -88,7 +103,8 @@ else
 	            exit 0
 	            ;;
 	        #TODO generare stringa in funzione
-	        l)  eval  "${BASE_BKP_CMD} collection-status ${DEST}"
+	        l)
+				eval  "${BASE_BKP_CMD} collection-status ${DEST}"
 	            ;;
 	        '?')
 	            show_help
