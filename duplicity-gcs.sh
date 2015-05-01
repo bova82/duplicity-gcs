@@ -70,20 +70,22 @@ execute_backup() {
 	  BKP_CMD="${BASE_BKP_CMD} --full-if-older-than ${FULL_BACKUP_EVERY}"
 	fi
 	LOG_CMD=""
+	LOG_APPEND_CMD=""
 	if [ ! -z "$LOG_DIR" ]; then
-	  #cd $LOG_DIR
+	  cd $LOG_DIR
 	  NOW="$(date +'%Y%m%d%H%M%S')"
 	  LOG_FILE="duplicity${NOW}.log"
 	  LOG_CMD="&> ${LOG_FILE}"
+	  LOG_APPEND_CMD="&>> ${LOG_FILE}"
 	fi
 	pwd
 	echo "${BKP_CMD} ${SRC} ${DEST} ${LOG_CMD}"
 	eval "${BKP_CMD} ${SRC} ${DEST} ${LOG_CMD}"
 
 	if [ ! -z "$FULL_BACKUPS_TO_MANTAIN" ]; then
-	  BKP_CMD2="${BASE_BKP_CMD} remove-all-but-n-full ${FULL_BACKUPS_TO_MANTAIN} --force ${DEST}"
-	  echo "${BKP_CMD2} ${LOG_CMD}"
-	  eval "${BKP_CMD2} ${LOG_CMD}"
+	  BKP_CLEAN_CMD="${BASE_BKP_CMD} remove-all-but-n-full ${FULL_BACKUPS_TO_MANTAIN} --force ${DEST}"
+	  echo "${BKP_CLEAN_CMD} ${LOG_CMD}"
+	  eval "${BKP_CLEAN_CMD} ${LOG_CMD}"
 	fi
 }
 
