@@ -37,15 +37,10 @@ if [ -z "$GPG_SIGN_PASSPHRASE" ]; then
   export SIGN_PASSPHRASE=$GPG_SIGN_PASSPHRASE
 fi
 
-# Usage info
-show_help() {
-cat << EOF
-Usage: ${0##*/} [-hl] ...
-    -h			display this help and exit
-    -l			list backups
-EOF
-}
+#base command
+BASE_BKP_CMD="duplicity"
 
+#Checking source and destination
 if [ -z "$SRC" -o -z "$DEST" ]; then
   if [ -z "$SRC" ]; then
     echo "Source must be specified"
@@ -55,7 +50,8 @@ if [ -z "$SRC" -o -z "$DEST" ]; then
   fi
   exit 1
 fi
-BASE_BKP_CMD="duplicity"
+
+#Encryption and signing
 if [ ! -z "$GPG_SIGN_KEY" ]; then
 	  BASE_BKP_CMD="${BASE_BKP_CMD} --sign-key ${GPG_SIGN_KEY}"
 fi
@@ -65,35 +61,64 @@ else
   BASE_BKP_CMD="${BASE_BKP_CMD} --no-encryption"
 fi
 
+#Setting log file
+LOGGABLE=false
+if [ ! -z "$FULL_BACKUP_EVERY" ]; then
+  BKP_CMD="${BASE_BKP_CMD} --full-if-older-than ${FULL_BACKUP_EVERY}"
+fi
+LOG_CMD=""
+LOG_APPEND_CMD=""
+if [ ! -z "$LOG_DIR" ]; then
+  cd $LOG_DIR
+  NOW="$(date +'%Y%m%d%H%M%S')"
+  LOG_FILE="duplicity${NOW}.log"
+
+  #testing if file is writeable
+  touch $LOG_FILE
+  if [ -w "$LOG_FILE" ]; then
+  	LOGGABLE=true
+  	#echo "Log file is writable"
+  	rm $LOG_FILE
+  else
+  	echo "Log file is not writable. Change or remove logging directory. Exiting."
+  	exit 1
+  fi
+
+fi
+
+# Usage info
+show_help() {
+cat << EOF
+Usage: ${0##*/} [-hl] ...
+    -h			display this help and exit
+    -l			list backups
+EOF
+}
+
 execute_backup() {
-	if [ ! -z "$FULL_BACKUP_EVERY" ]; then
-	  BKP_CMD="${BASE_BKP_CMD} --full-if-older-than ${FULL_BACKUP_EVERY}"
-	fi
-	LOG_CMD=""
-	LOG_APPEND_CMD=""
-	if [ ! -z "$LOG_DIR" ]; then
-	  cd $LOG_DIR
-	  NOW="$(date +'%Y%m%d%H%M%S')"
-	  LOG_FILE="duplicity${NOW}.log"
-	  LOG_CMD="&> ${LOG_FILE}"
-	  LOG_APPEND_CMD="&>> ${LOG_FILE}"
-	fi
-	pwd
-	echo "${BKP_CMD} ${SRC} ${DEST} ${LOG_CMD}"
-	eval "${BKP_CMD} ${SRC} ${DEST} ${LOG_CMD}"
+	#echo "${BKP_CMD} ${SRC} ${DEST}"
+	echo "### Backup script start ###"
+	echo "Backup in progress from ${SRC} to ${DEST}"
+	eval "${BKP_CMD} ${SRC} ${DEST}"
 
 	if [ ! -z "$FULL_BACKUPS_TO_MANTAIN" ]; then
+	  echo "Cleaning old full backups in ${DEST}"
 	  BKP_CLEAN_CMD="${BASE_BKP_CMD} remove-all-but-n-full ${FULL_BACKUPS_TO_MANTAIN} --force ${DEST}"
-	  echo "${BKP_CLEAN_CMD} ${LOG_CMD}"
-	  eval "${BKP_CLEAN_CMD} ${LOG_CMD}"
+	  #echo "${BKP_CLEAN_CMD}"
+	  eval "${BKP_CLEAN_CMD}"
 	fi
+	echo "### Backup script end ###"
 }
 
 
 if [ $# -eq 0 ];
 then
 #no options passed
-    execute_backup
+	if [ $LOGGABLE ]; then
+    	execute_backup &> $LOG_FILE
+	else
+		execute_backup
+	fi
     exit 0
 else
 #some options passed
@@ -106,7 +131,13 @@ else
 	            ;;
 	        #TODO generare stringa in funzione
 	        l)
-				eval  "${BASE_BKP_CMD} collection-status ${DEST}"
+				BKP_LIST_CMD="${BASE_BKP_CMD} collection-status ${DEST}"
+				if [ $LOGGABLE ]; then
+			    	eval $BKP_LIST_CMD &> $LOG_FILE
+				else
+					eval $BKP_LIST_CMD
+				fi
+				eval  
 	            ;;
 	        '?')
 	            show_help
